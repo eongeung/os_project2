@@ -5,14 +5,15 @@
 #include <ctime>
 #include <thread>
 #include <chrono>
-#include <sstream> 
+#include <sstream>
 
 class Process {
 public:
     int id;
     char type;
+    bool promoted;
 
-    Process(int id, char type) : id(id), type(type) {}
+    Process(int id, char type) : id(id), type(type), promoted(false) {}
 };
 
 class QueueManager {
@@ -33,7 +34,6 @@ public:
     }
 
     void simulateProcessSleep() {
-
         if (!dynamic_queue.empty()) {
             size_t index = rand() % dynamic_queue.size();
             int wait_time = rand() % 10 + 1;
@@ -46,6 +46,7 @@ public:
     void promoteProcess() {
         if (!wait_queue.empty()) {
             Process* process = wait_queue.front().first;
+            process->promoted = true;
             dynamic_queue.push_back(process);
             wait_queue.pop_front();
         }
@@ -81,7 +82,11 @@ public:
         if (!dynamic_queue.empty()) {
             std::cout << "P => ";
             for (size_t i = 0; i < dynamic_queue.size(); ++i) {
-                std::cout << "[" << dynamic_queue[i]->id << dynamic_queue[i]->type << "] ";
+                std::cout << "[" << dynamic_queue[i]->id << dynamic_queue[i]->type;
+                if (dynamic_queue[i]->promoted) {
+                    std::cout << "*";
+                }
+                std::cout << "] ";
                 if (i == dynamic_queue.size() - 1) {
                     std::cout << "(bottom/top)";
                 }
