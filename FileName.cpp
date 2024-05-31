@@ -10,7 +10,7 @@
 class Process {
 public:
     int id;
-    char type;
+    char type; // 'F' for Foreground, 'B' for Background
     bool promoted;
 
     Process(int id, char type) : id(id), type(type), promoted(false) {}
@@ -20,6 +20,7 @@ class QueueManager {
 private:
     std::deque<Process*> dynamic_queue;
     std::deque<std::pair<Process*, int>> wait_queue;
+    std::deque<std::pair<Process*, int>> dq_with_times; // Dynamic Queue with wait times
     Process* runningProcess = nullptr;
 
     std::string to_string(int value) {
@@ -31,6 +32,7 @@ private:
 public:
     void addProcess(Process* process) {
         dynamic_queue.push_back(process);
+        dq_with_times.push_back(std::make_pair(process, 0));
     }
 
     void simulateProcessSleep() {
@@ -39,6 +41,14 @@ public:
             int wait_time = rand() % 10 + 1;
             Process* process = dynamic_queue[index];
             dynamic_queue.erase(dynamic_queue.begin() + index);
+
+            for (auto it = dq_with_times.begin(); it != dq_with_times.end(); ++it) {
+                if (it->first == process) {
+                    dq_with_times.erase(it);
+                    break;
+                }
+            }
+
             wait_queue.push_back(std::make_pair(process, wait_time));
         }
     }
@@ -48,6 +58,7 @@ public:
             Process* process = wait_queue.front().first;
             process->promoted = true;
             dynamic_queue.push_back(process);
+            dq_with_times.push_back(wait_queue.front());
             wait_queue.pop_front();
         }
     }
@@ -56,6 +67,13 @@ public:
         if (!dynamic_queue.empty()) {
             runningProcess = dynamic_queue.front();
             dynamic_queue.pop_front();
+
+            for (auto it = dq_with_times.begin(); it != dq_with_times.end(); ++it) {
+                if (it->first == runningProcess) {
+                    dq_with_times.erase(it);
+                    break;
+                }
+            }
         }
         else {
             runningProcess = nullptr;
@@ -67,6 +85,7 @@ public:
             it->second--;
             if (it->second <= 0) {
                 dynamic_queue.push_back(it->first);
+                dq_with_times.push_back(*it);
                 it = wait_queue.erase(it);
             }
             else {
@@ -75,9 +94,16 @@ public:
         }
     }
 
+    void updateDQWithTimes() {
+        for (auto& pair : dq_with_times) {
+            pair.second++;
+        }
+    }
+
     void displayQueues() {
         std::cout << "Running: [" << (runningProcess ? to_string(runningProcess->id) + runningProcess->type : "") << "]" << std::endl;
         std::cout << "---------------------------" << std::endl;
+
         std::cout << "DQ: ";
         if (!dynamic_queue.empty()) {
             std::cout << "P => ";
@@ -87,19 +113,24 @@ public:
                     std::cout << "*";
                 }
                 std::cout << "] ";
-                if (i == dynamic_queue.size() - 1) {
-                    std::cout << "(bottom/top)";
+                if ((i + 1) % 3 == 0 || i == dynamic_queue.size() - 1) {
+                    std::cout << std::endl << "    ";
                 }
             }
+            std::cout << "(bottom/top)";
         }
         else {
             std::cout << "[]";
         }
         std::cout << std::endl << "---------------------------" << std::endl;
+
         std::cout << "WQ: ";
-        if (!wait_queue.empty()) {
-            for (auto& wp : wait_queue) {
-                std::cout << "[" << wp.first->id << wp.first->type << ":" << wp.second << "] ";
+        if (!dq_with_times.empty()) {
+            for (auto& pair : dq_with_times) {
+                std::cout << "[" << pair.first->id << pair.first->type << ":" << pair.second << "] ";
+                if ((&pair - &dq_with_times.front() + 1) % 3 == 0) {
+                    std::cout << std::endl << "    ";
+                }
             }
         }
         else {
@@ -117,6 +148,7 @@ public:
             simulateRunningProcess();
             simulateProcessSleep();
             decrementWaitTimes();
+            updateDQWithTimes();
             promoteProcess();
             displayQueues();
             auto end = std::chrono::high_resolution_clock::now();
@@ -141,3 +173,4 @@ int main() {
 
     return 0;
 }
+
