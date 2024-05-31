@@ -125,15 +125,17 @@ public:
         std::cout << std::endl << "---------------------------" << std::endl;
 
         std::cout << "WQ: ";
-        if (!dq_with_times.empty()) {
-            for (auto& pair : dq_with_times) {
+        bool has_wq = false;
+        for (auto& pair : dq_with_times) {
+            if (pair.second > 0) {
+                has_wq = true;
                 std::cout << "[" << pair.first->id << pair.first->type << ":" << pair.second << "] ";
                 if ((&pair - &dq_with_times.front() + 1) % 3 == 0) {
                     std::cout << std::endl << "    ";
                 }
             }
         }
-        else {
+        if (!has_wq) {
             std::cout << "[]";
         }
         std::cout << "\n..." << std::endl;
