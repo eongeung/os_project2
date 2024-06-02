@@ -6,6 +6,7 @@
 #include <thread>
 #include <chrono>
 #include <sstream>
+#include <algorithm>
 
 class Process {
 public:
@@ -43,6 +44,9 @@ public:
             Process* process = dynamic_queue[index];
             dynamic_queue.erase(dynamic_queue.begin() + index);
             wait_queue.push_back(std::make_pair(process, wait_time));
+            std::sort(wait_queue.begin(), wait_queue.end(), [](const std::pair<Process*, int>& a, const std::pair<Process*, int>& b) {
+                return a.second < b.second;
+                });
             if (promoteIndex >= dynamic_queue.size()) {
                 promoteIndex = 0;
             }
