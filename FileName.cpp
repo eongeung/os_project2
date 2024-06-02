@@ -6,7 +6,6 @@
 #include <thread>
 #include <chrono>
 #include <sstream>
-#include <algorithm>
 
 class Process {
 public:
@@ -21,8 +20,8 @@ class QueueManager {
 private:
     std::deque<Process*> dynamic_queue;
     std::deque<std::pair<Process*, int>> wait_queue;
+    std::deque<std::pair<Process*, int>> dq_with_times; // Dynamic Queue with wait times
     Process* runningProcess = nullptr;
-    size_t promoteIndex;
 
     std::string to_string(int value) {
         std::ostringstream oss;
@@ -31,10 +30,9 @@ private:
     }
 
 public:
-    QueueManager() : promoteIndex(0) {}
-
     void addProcess(Process* process) {
         dynamic_queue.push_back(process);
+        dq_with_times.push_back(std::make_pair(process, 0));
     }
 
     void simulateProcessSleep() {
@@ -43,13 +41,15 @@ public:
             int wait_time = rand() % 10 + 1;
             Process* process = dynamic_queue[index];
             dynamic_queue.erase(dynamic_queue.begin() + index);
-            wait_queue.push_back(std::make_pair(process, wait_time));
-            std::sort(wait_queue.begin(), wait_queue.end(), [](const std::pair<Process*, int>& a, const std::pair<Process*, int>& b) {
-                return a.second < b.second;
-                });
-            if (promoteIndex >= dynamic_queue.size()) {
-                promoteIndex = 0;
+
+            for (auto it = dq_with_times.begin(); it != dq_with_times.end(); ++it) {
+                if (it->first == process) {
+                    dq_with_times.erase(it);
+                    break;
+                }
             }
+
+            wait_queue.push_back(std::make_pair(process, wait_time));
         }
     }
 
@@ -58,10 +58,8 @@ public:
             Process* process = wait_queue.front().first;
             process->promoted = true;
             dynamic_queue.push_back(process);
+            dq_with_times.push_back(wait_queue.front());
             wait_queue.pop_front();
-        }
-        if (!dynamic_queue.empty()) {
-            promoteIndex = (promoteIndex + 1) % dynamic_queue.size();
         }
     }
 
@@ -69,8 +67,12 @@ public:
         if (!dynamic_queue.empty()) {
             runningProcess = dynamic_queue.front();
             dynamic_queue.pop_front();
-            if (promoteIndex >= dynamic_queue.size()) {
-                promoteIndex = 0;
+
+            for (auto it = dq_with_times.begin(); it != dq_with_times.end(); ++it) {
+                if (it->first == runningProcess) {
+                    dq_with_times.erase(it);
+                    break;
+                }
             }
         }
         else {
@@ -83,6 +85,7 @@ public:
             it->second--;
             if (it->second <= 0) {
                 dynamic_queue.push_back(it->first);
+                dq_with_times.push_back(*it);
                 it = wait_queue.erase(it);
             }
             else {
@@ -91,26 +94,30 @@ public:
         }
     }
 
+    void updateDQWithTimes() {
+        for (auto& pair : dq_with_times) {
+            pair.second++;
+        }
+    }
+
     void displayQueues() {
-        std::cout << "Running: [" << (runningProcess ? to_string(runningProcess->id) + runningProcess->type : "") << "] (bottom)" << std::endl;
+        std::cout << "Running: [" << (runningProcess ? to_string(runningProcess->id) + runningProcess->type : "") << "]" << std::endl;
         std::cout << "---------------------------" << std::endl;
 
         std::cout << "DQ: ";
         if (!dynamic_queue.empty()) {
             std::cout << "P => ";
             for (size_t i = 0; i < dynamic_queue.size(); ++i) {
-                if (i == promoteIndex) {
-                    std::cout << "(bottom) ";
-                }
                 std::cout << "[" << dynamic_queue[i]->id << dynamic_queue[i]->type;
                 if (dynamic_queue[i]->promoted) {
                     std::cout << "*";
                 }
                 std::cout << "] ";
-                if (i == dynamic_queue.size() - 1) {
-                    std::cout << "(top)";
+                if ((i + 1) % 3 == 0 || i == dynamic_queue.size() - 1) {
+                    std::cout << std::endl << "    ";
                 }
             }
+            std::cout << "(bottom/top)";
         }
         else {
             std::cout << "[]";
@@ -119,10 +126,13 @@ public:
 
         std::cout << "WQ: ";
         bool has_wq = false;
-        for (auto& pair : wait_queue) {
+        for (auto& pair : dq_with_times) {
             if (pair.second > 0) {
                 has_wq = true;
                 std::cout << "[" << pair.first->id << pair.first->type << ":" << pair.second << "] ";
+                if ((&pair - &dq_with_times.front() + 1) % 3 == 0) {
+                    std::cout << std::endl << "    ";
+                }
             }
         }
         if (!has_wq) {
@@ -140,6 +150,7 @@ public:
             simulateRunningProcess();
             simulateProcessSleep();
             decrementWaitTimes();
+            updateDQWithTimes();
             promoteProcess();
             displayQueues();
             auto end = std::chrono::high_resolution_clock::now();
