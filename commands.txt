@@ -2,5 +2,6 @@ echo abc ; echo def ; echo ghi
 echo jkl &
 gcd 48 18
 prime 100
-sum 1000
+sum 1000 -n 2 -d 30 -p 10 -m 4
+
 

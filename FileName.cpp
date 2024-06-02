@@ -35,6 +35,53 @@ private:
         return oss.str();
     }
 
+    void runCommandWithOptions(const std::string& cmd, int n, int d, int p, int m) {
+        auto commandRunner = [this](const std::string& cmd, int duration, int period, int parallel) {
+            if (parallel > 1 && cmd.find("sum") == 0) {
+                std::istringstream iss(cmd);
+                std::string command;
+                int x;
+                iss >> command >> x;
+
+                int chunkSize = x / parallel;
+                std::vector<std::future<long long>> futures;
+                for (int i = 0; i < parallel; ++i) {
+                    int start = i * chunkSize + 1;
+                    int end = (i == parallel - 1) ? x : (i + 1) * chunkSize;
+                    futures.push_back(std::async(std::launch::async, [start, end]() {
+                        long long sum = 0;
+                        for (int j = start; j <= end; ++j) {
+                            sum += j;
+                        }
+                        return sum;
+                        }));
+                }
+
+                long long totalSum = 0;
+                for (auto& fut : futures) {
+                    totalSum += fut.get();
+                }
+                std::cout << "Sum: " << totalSum % 1000000 << std::endl;
+            }
+            else {
+                auto start = std::chrono::high_resolution_clock::now();
+                while (true) {
+                    std::this_thread::sleep_for(std::chrono::seconds(period));
+                    executeCommand(cmd);
+                    auto end = std::chrono::high_resolution_clock::now();
+                    int elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+                    if (elapsed >= duration) {
+                        break;
+                    }
+                }
+            }
+        };
+
+        for (int i = 0; i < n; ++i) {
+            std::thread(commandRunner, cmd, d, p, m).detach();
+        }
+    }
+
 public:
     QueueManager() : promoteIndex(0) {}
 
@@ -171,7 +218,7 @@ public:
             std::cout << message << std::endl;
         }
         else if (cmd == "dummy") {
-            
+           
         }
         else if (cmd == "gcd") {
             int x, y;
@@ -209,6 +256,38 @@ public:
         }
     }
 
+    void executeCommandWithOptions(const std::string& command) {
+        std::istringstream iss(command);
+        std::string cmd;
+        int n = 1, d = 100, p = 1, m = 1;
+
+        std::string word;
+        while (iss >> word) {
+            if (word == "-n") {
+                iss >> n;
+            }
+            else if (word == "-d") {
+                iss >> d;
+            }
+            else if (word == "-p") {
+                iss >> p;
+            }
+            else if (word == "-m") {
+                iss >> m;
+            }
+            else {
+                if (cmd.empty()) {
+                    cmd = word;
+                }
+                else {
+                    cmd += " " + word;
+                }
+            }
+        }
+
+        runCommandWithOptions(cmd, n, d, p, m);
+    }
+
     void runShell(const std::string& filename) {
         std::ifstream file(filename);
         if (!file) {
@@ -222,7 +301,7 @@ public:
             while ((pos = command.find(';')) != std::string::npos) {
                 std::string subcommand = command.substr(0, pos);
                 std::cout << "prompt> ";
-                executeCommand(subcommand);
+                executeCommandWithOptions(subcommand);
                 command.erase(0, pos + 1);
                 std::this_thread::sleep_for(std::chrono::seconds(5));
             }
@@ -230,14 +309,14 @@ public:
             if ((pos = command.find('&')) != std::string::npos) {
                 std::string subcommand = command.substr(0, pos);
                 std::cout << "prompt> ";
-                std::thread bgThread(&QueueManager::executeCommand, this, subcommand);
+                std::thread bgThread(&QueueManager::executeCommandWithOptions, this, subcommand);
                 bgThread.detach();
                 command.erase(0, pos + 1);
                 std::cout << "Running in background: " << subcommand << std::endl;
             }
             else {
                 std::cout << "prompt> ";
-                executeCommand(command);
+                executeCommandWithOptions(command);
             }
             std::this_thread::sleep_for(std::chrono::seconds(5));
         }
