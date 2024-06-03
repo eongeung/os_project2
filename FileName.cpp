@@ -12,6 +12,7 @@
 #include <string>
 #include <future>
 
+// Process 클래스 정의
 class Process {
 public:
     int id;
@@ -21,6 +22,7 @@ public:
     Process(int id, char type) : id(id), type(type), promoted(false) {}
 };
 
+//QueueManager 클래스 정의
 class QueueManager {
 private:
     std::deque<Process*> dynamic_queue;
@@ -29,14 +31,17 @@ private:
     size_t promoteIndex;
     std::mutex mtx;
 
+//정수를 문자열로 변환하는 함수
     std::string to_string(int value) {
         std::ostringstream oss;
         oss << value;
         return oss.str();
     }
 
+//옵션과 함께 명령어를 실행하는 함수
     void runCommandWithOptions(const std::string& cmd, int n, int d, int p, int m) {
         auto commandRunner = [this](const std::string& cmd, int duration, int period, int parallel) {
+            //병렬 처리 옵션이 있는 경우
             if (parallel > 1 && cmd.find("sum") == 0) {
                 std::istringstream iss(cmd);
                 std::string command;
@@ -63,6 +68,7 @@ private:
                 }
                 std::cout << "Sum: " << totalSum % 1000000 << std::endl;
             }
+            //일반 처리
             else {
                 auto start = std::chrono::high_resolution_clock::now();
                 while (true) {
@@ -77,6 +83,7 @@ private:
             }
         };
 
+//n번만큼 명령어 실행
         for (int i = 0; i < n; ++i) {
             std::thread(commandRunner, cmd, d, p, m).detach();
         }
@@ -85,11 +92,13 @@ private:
 public:
     QueueManager() : promoteIndex(0) {}
 
+//프로세스 추가
     void addProcess(Process* process) {
         std::lock_guard<std::mutex> lock(mtx);
         dynamic_queue.push_back(process);
     }
 
+//프로세스 대기 시뮬레이션
     void simulateProcessSleep() {
         std::lock_guard<std::mutex> lock(mtx);
         if (!dynamic_queue.empty()) {
@@ -107,6 +116,7 @@ public:
         }
     }
 
+//프로세스 승격
     void promoteProcess() {
         std::lock_guard<std::mutex> lock(mtx);
         if (!wait_queue.empty()) {
@@ -120,6 +130,7 @@ public:
         }
     }
 
+//실행 중인 프로세스 시뮬레이션
     void simulateRunningProcess() {
         std::lock_guard<std::mutex> lock(mtx);
         if (!dynamic_queue.empty()) {
@@ -134,6 +145,7 @@ public:
         }
     }
 
+//대기 시간 감소
     void decrementWaitTimes() {
         std::lock_guard<std::mutex> lock(mtx);
         for (auto it = wait_queue.begin(); it != wait_queue.end(); ) {
@@ -148,6 +160,7 @@ public:
         }
     }
 
+//큐 상태 출력
     void displayQueues() {
         std::lock_guard<std::mutex> lock(mtx);
         std::cout << "Running: [" << (runningProcess ? to_string(runningProcess->id) + runningProcess->type : "") << "]" << std::endl;
@@ -190,6 +203,7 @@ public:
         std::cout << "\n..." << std::endl;
     }
 
+//시뮬레이션 실행
     void runSimulation(int duration, int interval) {
         auto start = std::chrono::high_resolution_clock::now();
         int time_passed = 0;
@@ -206,6 +220,7 @@ public:
         }
     }
 
+//명령어 실행
     void executeCommand(const std::string& command) {
         std::lock_guard<std::mutex> lock(mtx);
         std::istringstream iss(command);
@@ -256,6 +271,7 @@ public:
         }
     }
 
+//옵션과 함께 명령어 실행
     void executeCommandWithOptions(const std::string& command) {
         std::istringstream iss(command);
         std::string cmd;
@@ -288,6 +304,7 @@ public:
         runCommandWithOptions(cmd, n, d, p, m);
     }
 
+//쉘 실행
     void runShell(const std::string& filename) {
         std::ifstream file(filename);
         if (!file) {
@@ -312,7 +329,7 @@ public:
                 std::thread bgThread(&QueueManager::executeCommandWithOptions, this, subcommand);
                 bgThread.detach();
                 command.erase(0, pos + 1);
-                std::cout << "Running in background: " << subcommand << std::endl;
+                std::cout << "&" << subcommand << std::endl;
             }
             else {
                 std::cout << "prompt> ";
@@ -332,6 +349,7 @@ int main() {
         qm.addProcess(p);
     }
 
+//쉘과 모니터 스레드 시작
     std::thread shellThread(&QueueManager::runShell, &qm, "commands.txt");
     std::thread monitorThread(&QueueManager::runSimulation, &qm, 60, 5);
 
