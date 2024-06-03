@@ -12,6 +12,10 @@
 #include <string>
 #include <future>
 
+
+//2-1 완료
+//2-2 부분완료 (parse(), exec() 미완료)
+//2-3 부분완료 (명령어 종류, 명령어 옵션 기능 부분 완료 )
 // Process 클래스 정의
 class Process {
 public:
